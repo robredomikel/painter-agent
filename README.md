@@ -83,7 +83,7 @@ python multi_agent_painter.py --rounds 2 --allow-short-run --proxy-url "https://
 
 ## Observations To Record After Running
 
-After the proxy is pasted and the full run completes, inspect `round_01.png`, `round_05.png`, and `round_10.png`. In the final submission, summarize:
+After the proxy URL is provided and the full run completes, inspect `round_01.png`, `round_05.png`, and `round_10.png`. In the final submission, summarize:
 
 - Whether the lighthouse, island, sea, and sunset are recognizable.
 - Whether Critic feedback led to visible changes between rounds.

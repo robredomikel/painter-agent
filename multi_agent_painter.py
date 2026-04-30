@@ -3,9 +3,11 @@ from __future__ import annotations
 import argparse
 import ast
 import base64
+import copy
 import json
 import os
 import sys
+from io import BytesIO
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Any
@@ -18,10 +20,6 @@ ImageDraw = None
 CANVAS_SIZE = 200
 DEFAULT_ROUNDS = 10
 DEFAULT_MODEL = "openai/gpt-4.1-mini"
-
-# Paste the AWS/OpenRouter-compatible proxy URL from the assignment here, or set
-# AWS_PROXY_BASE_URL in your shell before running the script.
-AWS_PROXY_BASE_URL = "XXX"
 
 SUBJECT_PROMPT = (
     "A cheerful red-and-white lighthouse on a tiny green island at sunset, "
@@ -48,6 +46,83 @@ def import_ag2() -> tuple[Any, Any, Any, Any | None]:
         MultimodalConversableAgent = None
 
     return AssistantAgent, LLMConfig, UserProxyAgent, MultimodalConversableAgent
+
+
+def patch_ag2_image_formatter() -> None:
+    """Make AG2's multimodal formatter tolerant of already formatted image URLs."""
+
+    try:
+        from autogen.agentchat.contrib import img_utils
+        from autogen.agentchat.contrib import multimodal_conversable_agent
+    except ImportError:
+        return
+
+    def to_data_uri(image_value: Any) -> str:
+        import_pillow()
+
+        if hasattr(image_value, "save"):
+            buffered = BytesIO()
+            image_value.save(buffered, format="PNG")
+            encoded = base64.b64encode(buffered.getvalue()).decode("ascii")
+            return f"data:image/png;base64,{encoded}"
+
+        if isinstance(image_value, str):
+            value = image_value.strip()
+
+            # Already valid for OpenAI-compatible vision APIs.
+            if value.startswith("data:image/"):
+                return value
+
+            if value.startswith(("http://", "https://")):
+                return value
+
+            # Support file:// paths.
+            if value.startswith("file://"):
+                value = value.removeprefix("file://")
+
+            path = Path(value).expanduser()
+
+            # Also try resolving relative paths.
+            if not path.exists():
+                path = Path.cwd() / value
+
+            if path.exists():
+                with Image.open(path) as image:
+                    buffered = BytesIO()
+                    image.convert("RGB").save(buffered, format="PNG")
+                    encoded = base64.b64encode(buffered.getvalue()).decode("ascii")
+                    return f"data:image/png;base64,{encoded}"
+
+            # Important: do not crash with an unhelpful type-only error.
+            raise TypeError(
+                "Unsupported string image_url value for AG2 multimodal message: "
+                f"{image_value!r}. Expected a data URI, http(s) URL, or existing file path."
+            )
+
+        raise TypeError(
+            "Unsupported image_url value for AG2 multimodal message: "
+            f"{type(image_value)!r}"
+        )
+
+    def safe_message_formatter(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        new_messages = []
+
+        for message in messages:
+            if isinstance(message, dict) and isinstance(message.get("content"), list):
+                message = copy.deepcopy(message)
+
+                for item in message["content"]:
+                    if isinstance(item, dict) and isinstance(item.get("image_url"), dict):
+                        item["image_url"]["url"] = to_data_uri(
+                            item["image_url"]["url"]
+                        )
+
+            new_messages.append(message)
+
+        return new_messages
+
+    img_utils.message_formatter_pil_to_b64 = safe_message_formatter
+    multimodal_conversable_agent.message_formatter_pil_to_b64 = safe_message_formatter
 
 
 def import_pillow() -> None:
@@ -240,8 +315,18 @@ class DrawingCanvas:
         return self._color(value)
 
 
-def image_data_uri(path: Path) -> str:
-    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+def image_path_to_data_uri(path: Path) -> str:
+
+    import_pillow()
+
+    with Image.open(path) as image:
+
+        buffered = BytesIO()
+
+        image.convert("RGB").save(buffered, format="PNG")
+
+        encoded = base64.b64encode(buffered.getvalue()).decode("ascii")
+
     return f"data:image/png;base64,{encoded}"
 
 
@@ -249,7 +334,13 @@ def vision_message(text: str, image_path: Path) -> dict[str, Any]:
     return {
         "content": [
             {"type": "text", "text": text},
-            {"type": "image_url", "image_url": {"url": image_data_uri(image_path), "detail": "high"}},
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": image_path_to_data_uri(image_path),
+                    "detail": "high",
+                },
+            },
         ]
     }
 
@@ -276,6 +367,7 @@ def build_agents(
     critic_temperature: float,
 ) -> tuple[Any, Any, Any, Any]:
     AssistantAgent, LLMConfig, UserProxyAgent, MultimodalConversableAgent = import_ag2()
+    patch_ag2_image_formatter()
     VisionAgent = MultimodalConversableAgent or AssistantAgent
 
     painter_config = make_llm_config(LLMConfig, base_url, model, painter_temperature)
@@ -478,25 +570,25 @@ def last_text_from_chat(chat_result: Any) -> str:
     return str(summary).strip()
 
 
-def validate_base_url(base_url: str) -> str:
-    if not base_url or base_url == "PASTE_AWS_PROXY_URL_HERE":
+def validate_proxy_url(proxy_url: str) -> str:
+    if not proxy_url:
         raise SystemExit(
-            "Missing AWS proxy base URL. Paste it into AWS_PROXY_BASE_URL in "
-            "multi_agent_painter.py, set AWS_PROXY_BASE_URL, or pass --base-url."
+            "Missing AWS proxy URL. Pass it at execution time, for example:\n"
+            "  python multi_agent_painter.py --rounds 10 --proxy-url https://your-proxy-url"
         )
-    return base_url
+    return proxy_url
 
 
 def run(args: argparse.Namespace) -> None:
     if args.rounds < DEFAULT_ROUNDS and not args.allow_short_run:
         raise SystemExit("The assignment requires at least 10 rounds. Use --allow-short-run only for debugging.")
 
-    base_url = validate_base_url(args.base_url or os.getenv("AWS_PROXY_BASE_URL") or AWS_PROXY_BASE_URL)
+    proxy_url = validate_proxy_url(args.proxy_url or os.getenv("AWS_PROXY_BASE_URL", ""))
     output_dir = Path(args.output_dir)
     canvas = DrawingCanvas(output_dir=output_dir)
     painter, critic, tool_executor, reviewer = build_agents(
         canvas=canvas,
-        base_url=base_url,
+        base_url=proxy_url,
         model=args.model,
         painter_temperature=args.painter_temperature,
         critic_temperature=args.critic_temperature,
@@ -559,7 +651,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="AG2 multi-agent Painter and Critic assignment.")
     parser.add_argument("--rounds", type=int, default=DEFAULT_ROUNDS, help="Number of Painter/Critic rounds.")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="OpenRouter model name.")
-    parser.add_argument("--base-url", default="", help="AWS proxy base URL. Overrides the code/env placeholder.")
+    parser.add_argument(
+        "--proxy-url",
+        "--base-url",
+        dest="proxy_url",
+        default="",
+        help="AWS proxy URL for the OpenAI-compatible endpoint.",
+    )
     parser.add_argument("--output-dir", default="outputs", help="Directory where round images are saved.")
     parser.add_argument(
         "--log-file",
