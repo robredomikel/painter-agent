@@ -17,11 +17,11 @@ The implementation uses two AG2 agent instances:
 
 The canvas tools are executed by an AG2 `UserProxyAgent` named `CanvasToolExecutor`. It executes the Painter's tool calls and then stops that Painter step, which avoids a provider-specific issue where the proxy rejects follow-up LLM calls containing tool-result history. The Painter has five drawing tools available:
 
-- `draw_rectangle`
-- `draw_ellipse`
-- `draw_line`
-- `draw_polygon`
-- `draw_text`
+- `draw_rectangle` First linear simple area that helps draw bigger parts of the cancas picture.
+- `draw_ellipse` Nonlinear area for figures such as the sun, or the flower.
+- `draw_line` Second linear tool to "retouch" the initial drawing perform with the rectangles.
+- `draw_polygon` A more polivalent figure to improve the detailness of the drawings in case more rounds were provided.
+- `draw_text` I didn't know what else to give as an option
 
 The round scheduler keeps the assignment structure simple: each round has exactly two main steps, Painter then Critic. Each step is performed through AG2's `initiate_chat` mechanism, and the script saves every round image as `outputs/round_XX.png`.
 
@@ -83,9 +83,8 @@ python multi_agent_painter.py --rounds 2 --allow-short-run --proxy-url "https://
 
 ## Observations To Record After Running
 
-After the proxy URL is provided and the full run completes, inspect `round_01.png`, `round_05.png`, and `round_10.png`. In the final submission, summarize:
+After the proxy URL is provided and the full run completes, inspect `round_01.png`, `round_05.png`, and `round_10.png`. In the final submission:
 
-- Whether the smiling sun, flower, clouds, sky, and grass are recognizable.
-- Whether Critic feedback led to visible changes between rounds.
-- Any recurring tool-use problems, such as shapes covering earlier details or the Painter making changes that are too small for a 200x200 image.
-- Whether the final image has enough contrast and simple readable pixel-art forms.
+- Well, on the first hand, it can be cleary seen that the 10 rounds do an iterative process for improving the final picture. However, the final picture lacks quality and rests far from the initial idea provided in the initial prompt.
+- While the initial rounds emphasize the use of linear tools such as the draw rectangles and lines, more ellipses are drawn towards the last rounds of the drawing process.
+- As a final note, it would be interesting to see how the picture evolves with a larger limit of rounds (e.g. 50, 100) 
