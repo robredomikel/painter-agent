@@ -6,7 +6,7 @@ This project implements Assignment 3 with the AG2 framework. A Painter agent dra
 
 The chosen drawing subject is:
 
-> A cheerful red-and-white lighthouse on a tiny green island at sunset, with blue sea waves, warm sky bands, a glowing lantern, clouds, and a few birds. The final image should read clearly as pixel-art style on a 200x200 canvas.
+> A very simple, cheerful pixel-art scene with only five large elements: a bright blue sky, a green grass band, one big yellow smiling sun in the upper left, one red flower with a yellow center in the lower right, and two small white clouds. Use bold colors, clean outlines, and uncluttered shapes on the 200x200 canvas. Do not add extra objects or text.
 
 ## Design
 
@@ -85,7 +85,7 @@ python multi_agent_painter.py --rounds 2 --allow-short-run --proxy-url "https://
 
 After the proxy URL is provided and the full run completes, inspect `round_01.png`, `round_05.png`, and `round_10.png`. In the final submission, summarize:
 
-- Whether the lighthouse, island, sea, and sunset are recognizable.
+- Whether the smiling sun, flower, clouds, sky, and grass are recognizable.
 - Whether Critic feedback led to visible changes between rounds.
 - Any recurring tool-use problems, such as shapes covering earlier details or the Painter making changes that are too small for a 200x200 image.
 - Whether the final image has enough contrast and simple readable pixel-art forms.

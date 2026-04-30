@@ -22,10 +22,11 @@ DEFAULT_ROUNDS = 10
 DEFAULT_MODEL = "openai/gpt-4.1-mini"
 
 SUBJECT_PROMPT = (
-    "A cheerful red-and-white lighthouse on a tiny green island at sunset, "
-    "with blue sea waves, warm sky bands, a glowing lantern, clouds, and a "
-    "few birds. The final image should read clearly as pixel-art style on a "
-    "200x200 canvas."
+    "A very simple, cheerful pixel-art scene with only five large elements: "
+    "a bright blue sky, a green grass band, one big yellow smiling sun in the "
+    "upper left, one red flower with a yellow center in the lower right, and "
+    "two small white clouds. Use bold colors, clean outlines, and uncluttered "
+    "shapes on the 200x200 canvas. Do not add extra objects or text."
 )
 
 
@@ -417,7 +418,9 @@ def build_agents(
             "Use several tool calls per round, preserve strong existing features, and apply "
             "the Critic's feedback directly. Coordinates use x,y with (0,0) at the top-left "
             "and (199,199) at the bottom-right. Prefer broad shapes and clear color blocks "
-            "over single pixels. After tool calls, reply with a concise summary ending in DONE."
+            "over single pixels. Keep the scene simple and readable: refine the sun, flower, "
+            "clouds, sky, and grass instead of adding new objects. After tool calls, reply "
+            "with a concise summary ending in DONE."
         ),
         llm_config=painter_config,
         human_input_mode="NEVER",
@@ -541,7 +544,8 @@ def critic_prompt(round_number: int, total_rounds: int) -> str:
         f"Round {round_number} of {total_rounds} review.\n"
         "The image produced by the Painter is attached. Review the actual image visually. "
         "Return concise feedback under WORKS WELL, CHANGES NEEDED, and NEXT PAINTER INSTRUCTIONS. "
-        "The next instructions should be concrete enough for tool-based drawing on a 200x200 canvas."
+        "The next instructions should be concrete enough for tool-based drawing on a 200x200 canvas. "
+        "Prioritize a clean, attractive simple picture over adding more details."
     )
 
 
@@ -638,7 +642,10 @@ def run(args: argparse.Namespace) -> None:
     ]
 
     current_image = canvas.save("round_00_initial.png")
-    feedback = "No previous critique yet. Establish the main composition: sunset sky, sea, island, and lighthouse."
+    feedback = (
+        "No previous critique yet. Establish the whole simple scene with large shapes: "
+        "blue sky, green grass, big smiling yellow sun, one red flower, and two white clouds."
+    )
 
     for round_number in range(1, args.rounds + 1):
         canvas.reset_round_counter()
