@@ -15,7 +15,7 @@ The implementation uses two AG2 agent instances:
 - `Painter`: a multimodal AG2 agent that receives the current canvas image and the latest Critic feedback. It modifies the canvas by calling registered drawing tools.
 - `Critic`: a multimodal AG2 agent that receives the saved PNG for the round and returns structured visual feedback.
 
-The canvas tools are executed by an AG2 `UserProxyAgent` named `CanvasToolExecutor`. The Painter has five drawing tools available:
+The canvas tools are executed by an AG2 `UserProxyAgent` named `CanvasToolExecutor`. It executes the Painter's tool calls and then stops that Painter step, which avoids a provider-specific issue where the proxy rejects follow-up LLM calls containing tool-result history. The Painter has five drawing tools available:
 
 - `draw_rectangle`
 - `draw_ellipse`

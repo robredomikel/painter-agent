@@ -150,6 +150,39 @@ def is_done_message(message: dict[str, Any]) -> bool:
     return False
 
 
+def make_one_way_tool_executor(UserProxyAgent: Any) -> Any:
+    class OneWayToolExecutor(UserProxyAgent):
+        """Execute tool calls and stop before provider-incompatible follow-up calls."""
+
+        def receive(
+            self,
+            message: dict[str, Any] | str,
+            sender: Any,
+            request_reply: bool | None = None,
+            silent: bool | None = False,
+        ) -> None:
+            self._process_received_message(message, sender, silent)
+            if request_reply is False:
+                return
+
+            messages = self.chat_messages[sender]
+            last_message = messages[-1] if messages else {}
+            if isinstance(last_message, dict) and last_message.get("tool_calls"):
+                final, reply = self.generate_tool_calls_reply(messages=messages, sender=sender)
+                if final and reply is not None:
+                    self._append_oai_message(
+                        reply,
+                        sender,
+                        role=reply.get("role", "assistant"),
+                        name=self.name,
+                    )
+                return
+
+            return None
+
+    return OneWayToolExecutor
+
+
 @dataclass
 class DrawingCanvas:
     output_dir: Path
@@ -369,6 +402,7 @@ def build_agents(
     AssistantAgent, LLMConfig, UserProxyAgent, MultimodalConversableAgent = import_ag2()
     patch_ag2_image_formatter()
     VisionAgent = MultimodalConversableAgent or AssistantAgent
+    OneWayToolExecutor = make_one_way_tool_executor(UserProxyAgent)
 
     painter_config = make_llm_config(LLMConfig, base_url, model, painter_temperature)
     critic_config = make_llm_config(LLMConfig, base_url, model, critic_temperature)
@@ -405,7 +439,7 @@ def build_agents(
         max_consecutive_auto_reply=2,
     )
 
-    tool_executor = UserProxyAgent(
+    tool_executor = OneWayToolExecutor(
         name="CanvasToolExecutor",
         human_input_mode="NEVER",
         code_execution_config=False,
@@ -614,7 +648,6 @@ def run(args: argparse.Namespace) -> None:
             painter,
             message=vision_message(painter_prompt(round_number, args.rounds, feedback), current_image),
             clear_history=True,
-            max_turns=args.painter_max_turns,
             summary_method="last_msg",
             silent=args.silent,
         )
@@ -622,7 +655,7 @@ def run(args: argparse.Namespace) -> None:
         if canvas.operation_count == 0:
             log_lines.append(
                 "**Warning:** The Painter did not execute any drawing tools in this round. "
-                "Try rerunning or increasing --painter-max-turns."
+                "Try rerunning or adjusting the Painter prompt/model."
             )
 
         current_image = canvas.save_round(round_number)
@@ -665,7 +698,6 @@ def parse_args() -> argparse.Namespace:
         default=Path("conversation_log.md"),
         help="Markdown file for the full conversation log.",
     )
-    parser.add_argument("--painter-max-turns", type=int, default=8, help="AG2 turns allowed for each Painter step.")
     parser.add_argument("--painter-temperature", type=float, default=0.35, help="Painter model temperature.")
     parser.add_argument("--critic-temperature", type=float, default=0.2, help="Critic model temperature.")
     parser.add_argument("--silent", action="store_true", help="Suppress AG2 console output.")
