@@ -37,34 +37,35 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-Paste the AWS proxy URL into `AWS_PROXY_BASE_URL` in `multi_agent_painter.py`, replacing:
-
-```python
-AWS_PROXY_BASE_URL = "PASTE_AWS_PROXY_URL_HERE"
-```
-
-You can also avoid editing the file by setting an environment variable:
+Pass the AWS proxy URL when running the script:
 
 ```bash
-export AWS_PROXY_BASE_URL="https://your-proxy-url-here"
+python multi_agent_painter.py --rounds 10 --proxy-url "https://your-proxy-url-here"
 ```
 
 No API key is required for the assignment proxy. The script sends `"not-needed"` as the placeholder API key because OpenAI-compatible clients usually require a non-empty value.
+
+You can also set the proxy once as an environment variable:
+
+```bash
+export AWS_PROXY_BASE_URL="https://your-proxy-url-here"
+python multi_agent_painter.py --rounds 10
+```
 
 ## Run
 
 Run the required 10 rounds:
 
 ```bash
-python multi_agent_painter.py --rounds 10
+python multi_agent_painter.py --rounds 10 --proxy-url "https://your-proxy-url-here"
 ```
 
 Optional model choices from the assignment:
 
 ```bash
-python multi_agent_painter.py --model openai/gpt-4.1-mini
-python multi_agent_painter.py --model openai/gpt-4.1-nano
-python multi_agent_painter.py --model qwen/qwen3.5-flash-02-23
+python multi_agent_painter.py --rounds 10 --proxy-url "https://your-proxy-url-here" --model openai/gpt-4.1-mini
+python multi_agent_painter.py --rounds 10 --proxy-url "https://your-proxy-url-here" --model openai/gpt-4.1-nano
+python multi_agent_painter.py --rounds 10 --proxy-url "https://your-proxy-url-here" --model qwen/qwen3.5-flash-02-23
 ```
 
 The script writes:
@@ -77,7 +78,7 @@ The script writes:
 For a quick local debugging run with fewer than 10 rounds:
 
 ```bash
-python multi_agent_painter.py --rounds 2 --allow-short-run
+python multi_agent_painter.py --rounds 2 --allow-short-run --proxy-url "https://your-proxy-url-here"
 ```
 
 ## Observations To Record After Running

@@ -21,7 +21,7 @@ DEFAULT_MODEL = "openai/gpt-4.1-mini"
 
 # Paste the AWS/OpenRouter-compatible proxy URL from the assignment here, or set
 # AWS_PROXY_BASE_URL in your shell before running the script.
-AWS_PROXY_BASE_URL = "PASTE_AWS_PROXY_URL_HERE"
+AWS_PROXY_BASE_URL = "XXX"
 
 SUBJECT_PROMPT = (
     "A cheerful red-and-white lighthouse on a tiny green island at sunset, "
